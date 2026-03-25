@@ -358,7 +358,18 @@ export type Database = {
       is_executive: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "ceo" | "cto" | "coo" | "hr" | "sysadmin" | "staff"
+      app_role:
+        | "ceo"
+        | "cto"
+        | "coo"
+        | "hr"
+        | "sysadmin"
+        | "staff"
+        | "cio"
+        | "finance_manager"
+        | "bd_head"
+        | "network_engineer"
+        | "support_tech"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -486,7 +497,19 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["ceo", "cto", "coo", "hr", "sysadmin", "staff"],
+      app_role: [
+        "ceo",
+        "cto",
+        "coo",
+        "hr",
+        "sysadmin",
+        "staff",
+        "cio",
+        "finance_manager",
+        "bd_head",
+        "network_engineer",
+        "support_tech",
+      ],
     },
   },
 } as const
