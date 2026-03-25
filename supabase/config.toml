@@ -1,13 +1,1 @@
-project_id = "potrotlxvkvjolpfmszm"
-
-[functions.create-staff-accounts]
-verify_jwt = false
-
-[functions.send-announcement-email]
-verify_jwt = false
-
-[functions.create-single-staff]
-verify_jwt = false
-
-[functions.agora-token]
-verify_jwt = false
+project_id = "hrifahxizhvhqmeqlkvm"
