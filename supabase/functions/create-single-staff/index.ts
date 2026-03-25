@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { full_name, email, position, department, role } = await req.json();
+    const { full_name, email, position, department, role, roles: multiRoles } = await req.json();
 
     if (!full_name || !email) {
       return new Response(JSON.stringify({ error: "Name and email required" }), {
@@ -99,11 +99,15 @@ Deno.serve(async (req) => {
       must_change_password: true,
     }).eq("user_id", userData.user.id);
 
-    // Assign role
-    if (role) {
+    // Assign roles (support both single role and multiple roles)
+    const rolesToAssign = multiRoles && Array.isArray(multiRoles) && multiRoles.length > 0
+      ? multiRoles
+      : (role ? [role] : ['staff']);
+
+    for (const r of rolesToAssign) {
       await supabaseAdmin.from("user_roles").insert({
         user_id: userData.user.id,
-        role,
+        role: r,
       });
     }
 
