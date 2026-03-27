@@ -296,7 +296,56 @@ export default function PerformancePage() {
             </Card>
           </TabsContent>
 
-          {/* PLAN RECORDS TAB */}
+          {/* WEIGHTED PERFORMANCE TAB */}
+          <TabsContent value="weighted" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-heading font-semibold text-foreground">Weighted Performance (Plans 25% · Projects 25% · Tickets 25% · Attendance 25%)</h3>
+              <input
+                type="month"
+                value={weightedMonth}
+                onChange={(e) => { setWeightedMonth(e.target.value); }}
+                className="rounded-md border border-input bg-background px-3 py-1.5 text-xs"
+              />
+            </div>
+
+            {/* My Score */}
+            {myWeighted && (
+              <WeightedPerformanceCard score={myWeighted} staffName="My Performance" />
+            )}
+
+            {/* All Staff (executive view) */}
+            {(isExecutive || isCeo) && allWeighted.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-heading text-sm flex items-center gap-2">
+                    <Scale className="w-4 h-4 text-primary" />All Staff Weighted Scores — {weightedMonth}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {allWeighted.map((staff: any, idx: number) => (
+                    <div key={staff.user_id} className={`flex items-center gap-3 p-3 rounded-xl ${idx === 0 ? "bg-gold/10 border border-gold/30" : "bg-muted/50"}`}>
+                      <div className="text-sm font-heading w-6 text-center font-bold text-muted-foreground">
+                        {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`}
+                      </div>
+                      <div className="w-9 h-9 rounded-full gradient-brand flex items-center justify-center text-primary-foreground font-bold text-sm overflow-hidden">
+                        {staff.avatar_url ? <img src={staff.avatar_url} alt="" className="w-full h-full object-cover" /> : staff.full_name?.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-heading font-semibold text-sm text-foreground truncate">{staff.full_name}</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          P:{staff.plansScore}% · Proj:{staff.projectsScore}% · T:{staff.ticketsScore}% · A:{staff.attendanceScore}%
+                        </div>
+                      </div>
+                      <div className={`font-heading font-bold text-lg ${staff.overallScore >= 80 ? "text-green-600" : staff.overallScore >= 60 ? "text-amber-600" : "text-destructive"}`}>
+                        {staff.overallScore}%
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
           <TabsContent value="records">
             <Card>
               <CardHeader>
