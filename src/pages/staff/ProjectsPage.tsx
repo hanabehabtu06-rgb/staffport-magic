@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, FolderKanban, Users, Circle, Clock, Check, ChevronRight, MessageSquare, BarChart3, CalendarIcon, Target, AlertTriangle, CheckCircle, Flag, Send, Trash2 } from "lucide-react";
+import { Plus, FolderKanban, Users, Circle, Clock, Check, ChevronRight, MessageSquare, BarChart3, CalendarIcon, Target, AlertTriangle, CheckCircle, Flag, Send, Trash2, Paperclip, File } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import StaffLayout from "@/components/staff/StaffLayout";
 import TeamChat from "@/components/staff/TeamChat";
+import ProjectFileUpload from "@/components/staff/ProjectFileUpload";
 
 const STATUS_CONFIG = {
   todo: { label: "To Do", icon: Circle, color: "text-muted-foreground" },
@@ -46,7 +47,7 @@ export default function ProjectsPage() {
   const [showAddMilestone, setShowAddMilestone] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [groupForm, setGroupForm] = useState({ name: "", description: "", member_ids: [] as string[], start_date: undefined as Date | undefined, end_date: undefined as Date | undefined });
-  const [taskForm, setTaskForm] = useState({ title: "", description: "", assigned_to: "", status: "todo" });
+  const [taskForm, setTaskForm] = useState({ title: "", description: "", assigned_to: "", status: "todo", attachments: [] as string[] });
   const [milestoneForm, setMilestoneForm] = useState({ target_percentage: 25, target_date: undefined as Date | undefined });
   const [reviewForm, setReviewForm] = useState({ milestone_id: "", status: "on_track", notes: "", action_items: "" });
   const [showReview, setShowReview] = useState<string | null>(null);
@@ -134,6 +135,7 @@ export default function ProjectsPage() {
       assigned_to: taskForm.assigned_to || null,
       status: taskForm.status,
       created_by: authUser.id,
+      attachments: taskForm.attachments.length > 0 ? taskForm.attachments : null,
     });
     if (taskForm.assigned_to) {
       await supabase.from("notifications").insert({
@@ -144,7 +146,7 @@ export default function ProjectsPage() {
         related_id: selectedGroup.id,
       });
     }
-    setTaskForm({ title: "", description: "", assigned_to: "", status: "todo" });
+    setTaskForm({ title: "", description: "", assigned_to: "", status: "todo", attachments: [] });
     setShowNewTask(false);
     loadTasks(selectedGroup.id);
   };
@@ -428,6 +430,13 @@ export default function ProjectsPage() {
                                   <option value="done">Done</option>
                                 </select>
                               </div>
+                              <ProjectFileUpload
+                                bucket="project-attachments"
+                                folder={selectedGroup.id}
+                                existingUrls={taskForm.attachments}
+                                onUploadComplete={(urls) => setTaskForm((f) => ({ ...f, attachments: urls }))}
+                                maxFiles={5}
+                              />
                               <div className="flex gap-2">
                                 <Button size="sm" variant="outline" onClick={() => setShowNewTask(false)} className="flex-1">Cancel</Button>
                                 <Button size="sm" onClick={createTask} className="flex-1 gradient-brand text-primary-foreground font-heading">Add Task</Button>
@@ -459,6 +468,17 @@ export default function ProjectsPage() {
                                     <div className="flex items-center gap-1 mt-2">
                                       <div className="w-4 h-4 rounded-full gradient-brand flex items-center justify-center text-[8px] text-primary-foreground font-bold">{task.assignee.full_name.charAt(0)}</div>
                                       <span className="text-[10px] text-muted-foreground">{task.assignee.full_name}</span>
+                                    </div>
+                                  )}
+                                  {task.attachments && task.attachments.length > 0 && (
+                                    <div className="flex items-center gap-1 mt-1.5">
+                                      <Paperclip className="w-3 h-3 text-muted-foreground" />
+                                      <span className="text-[10px] text-muted-foreground">{task.attachments.length} file(s)</span>
+                                      {task.attachments.map((url: string, i: number) => (
+                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline">
+                                          <File className="w-3 h-3 inline" />
+                                        </a>
+                                      ))}
                                     </div>
                                   )}
                                   {isMember && (

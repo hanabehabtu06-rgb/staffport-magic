@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Clock, LogIn, LogOut, Calendar, Timer, PlaneTakeoff, CheckCircle, X, Plus, Users } from "lucide-react";
+import { Clock, LogIn, LogOut, Calendar, Timer, PlaneTakeoff, CheckCircle, X, Plus, Users, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import StaffLayout from "@/components/staff/StaffLayout";
 import ExecutiveAttendanceView from "@/components/staff/ExecutiveAttendanceView";
+import { buildStaffSummaries, exportCSV, exportPDF } from "@/lib/attendance-export";
 
 const LEAVE_TYPES = ["annual", "sick", "personal", "maternity", "paternity", "unpaid"];
 
@@ -296,7 +297,39 @@ export default function AttendancePage() {
 
             {/* History - grouped by date */}
             <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-base font-heading">Recent Attendance</CardTitle></CardHeader>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base font-heading">Recent Attendance</CardTitle>
+                  {attendanceHistory.length > 0 && user && (
+                    <div className="flex gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-xs"
+                        onClick={() => {
+                          const summaries = buildStaffSummaries(attendanceHistory, profiles);
+                          const mine = summaries.find(s => s.userId === user.id);
+                          if (mine) exportCSV(mine);
+                        }}
+                      >
+                        <Download className="w-3 h-3" />CSV
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-xs"
+                        onClick={() => {
+                          const summaries = buildStaffSummaries(attendanceHistory, profiles);
+                          const mine = summaries.find(s => s.userId === user.id);
+                          if (mine) exportPDF(mine);
+                        }}
+                      >
+                        <Download className="w-3 h-3" />PDF
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <table className="w-full">
