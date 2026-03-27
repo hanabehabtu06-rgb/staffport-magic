@@ -128,7 +128,19 @@ export default function PerformancePage() {
         quarterly: countApprovals(quarterlyRes.data || []),
         total: mySummary ? Number(mySummary.average_grade) : 0,
       });
+      // Calculate weighted performance for current user
+      const monthDate = new Date(weightedMonth + "-01");
+      const weighted = await calculateWeightedPerformance(user.id, monthDate);
+      setMyWeighted(weighted);
     }
+
+    // If executive, calculate all staff weighted scores
+    if (isExecutive || isCeo) {
+      const monthDate = new Date(weightedMonth + "-01");
+      const all = await calculateAllStaffPerformance(monthDate);
+      setAllWeighted(all);
+    }
+
     setLoading(false);
   };
 
