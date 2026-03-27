@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Trophy, Award, Star, TrendingUp, BarChart3, AlertTriangle, CheckCircle, Shield, Calendar, LineChart } from "lucide-react";
+import { Trophy, Award, Star, TrendingUp, BarChart3, AlertTriangle, CheckCircle, Shield, Calendar, LineChart, Scale } from "lucide-react";
 import { format, getISOWeek } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
