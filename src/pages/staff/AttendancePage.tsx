@@ -297,7 +297,39 @@ export default function AttendancePage() {
 
             {/* History - grouped by date */}
             <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-base font-heading">Recent Attendance</CardTitle></CardHeader>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base font-heading">Recent Attendance</CardTitle>
+                  {attendanceHistory.length > 0 && user && (
+                    <div className="flex gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-xs"
+                        onClick={() => {
+                          const summaries = buildStaffSummaries(attendanceHistory, profiles);
+                          const mine = summaries.find(s => s.userId === user.id);
+                          if (mine) exportCSV(mine);
+                        }}
+                      >
+                        <Download className="w-3 h-3" />CSV
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-xs"
+                        onClick={() => {
+                          const summaries = buildStaffSummaries(attendanceHistory, profiles);
+                          const mine = summaries.find(s => s.userId === user.id);
+                          if (mine) exportPDF(mine);
+                        }}
+                      >
+                        <Download className="w-3 h-3" />PDF
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <table className="w-full">
