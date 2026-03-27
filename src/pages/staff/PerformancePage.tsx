@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Trophy, Award, Star, TrendingUp, BarChart3, AlertTriangle, CheckCircle, Shield, Calendar, LineChart } from "lucide-react";
+import { Trophy, Award, Star, TrendingUp, BarChart3, AlertTriangle, CheckCircle, Shield, Calendar, LineChart, Scale } from "lucide-react";
 import { format, getISOWeek } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,7 +13,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StaffLayout from "@/components/staff/StaffLayout";
 import PlanPerformanceTracker from "@/components/staff/PlanPerformanceTracker";
 import PerformanceTrendsChart from "@/components/staff/PerformanceTrendsChart";
+import WeightedPerformanceCard from "@/components/staff/WeightedPerformanceCard";
 import { getQuarterKey, getWeekKey, getMonthKey } from "@/lib/performance-utils";
+import { calculateWeightedPerformance, calculateAllStaffPerformance, type WeightedScore } from "@/lib/weighted-performance";
 
 const currentQuarter = () => getQuarterKey(new Date());
 
@@ -38,6 +40,13 @@ export default function PerformancePage() {
   const [periodFilter, setPeriodFilter] = useState("weekly");
   const [trendStaff, setTrendStaff] = useState("");
   const [trendPeriod, setTrendPeriod] = useState("weekly");
+  const [myWeighted, setMyWeighted] = useState<WeightedScore | null>(null);
+  const [allWeighted, setAllWeighted] = useState<any[]>([]);
+  const [weightedMonth, setWeightedMonth] = useState(format(new Date(), "yyyy-MM"));
+
+  useEffect(() => {
+    loadData();
+  }, [weightedMonth]);
 
   useEffect(() => {
     loadData();
@@ -124,7 +133,19 @@ export default function PerformancePage() {
         quarterly: countApprovals(quarterlyRes.data || []),
         total: mySummary ? Number(mySummary.average_grade) : 0,
       });
+      // Calculate weighted performance for current user
+      const monthDate = new Date(weightedMonth + "-01");
+      const weighted = await calculateWeightedPerformance(user.id, monthDate);
+      setMyWeighted(weighted);
     }
+
+    // If executive, calculate all staff weighted scores
+    if (isExecutive || isCeo) {
+      const monthDate = new Date(weightedMonth + "-01");
+      const all = await calculateAllStaffPerformance(monthDate);
+      setAllWeighted(all);
+    }
+
     setLoading(false);
   };
 
@@ -212,8 +233,9 @@ export default function PerformancePage() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full">
+          <TabsList className="w-full flex-wrap">
             <TabsTrigger value="overview" className="flex-1 gap-1"><BarChart3 className="w-3 h-3" />Overview</TabsTrigger>
+            <TabsTrigger value="weighted" className="flex-1 gap-1"><Scale className="w-3 h-3" />Weighted</TabsTrigger>
             <TabsTrigger value="records" className="flex-1 gap-1"><TrendingUp className="w-3 h-3" />Plan Records</TabsTrigger>
             <TabsTrigger value="trends" className="flex-1 gap-1"><LineChart className="w-3 h-3" />Trends</TabsTrigger>
             <TabsTrigger value="summaries" className="flex-1 gap-1"><Calendar className="w-3 h-3" />Period Summaries</TabsTrigger>
@@ -279,7 +301,56 @@ export default function PerformancePage() {
             </Card>
           </TabsContent>
 
-          {/* PLAN RECORDS TAB */}
+          {/* WEIGHTED PERFORMANCE TAB */}
+          <TabsContent value="weighted" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-heading font-semibold text-foreground">Weighted Performance (Plans 25% · Projects 25% · Tickets 25% · Attendance 25%)</h3>
+              <input
+                type="month"
+                value={weightedMonth}
+                onChange={(e) => { setWeightedMonth(e.target.value); }}
+                className="rounded-md border border-input bg-background px-3 py-1.5 text-xs"
+              />
+            </div>
+
+            {/* My Score */}
+            {myWeighted && (
+              <WeightedPerformanceCard score={myWeighted} staffName="My Performance" />
+            )}
+
+            {/* All Staff (executive view) */}
+            {(isExecutive || isCeo) && allWeighted.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-heading text-sm flex items-center gap-2">
+                    <Scale className="w-4 h-4 text-primary" />All Staff Weighted Scores — {weightedMonth}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {allWeighted.map((staff: any, idx: number) => (
+                    <div key={staff.user_id} className={`flex items-center gap-3 p-3 rounded-xl ${idx === 0 ? "bg-gold/10 border border-gold/30" : "bg-muted/50"}`}>
+                      <div className="text-sm font-heading w-6 text-center font-bold text-muted-foreground">
+                        {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`}
+                      </div>
+                      <div className="w-9 h-9 rounded-full gradient-brand flex items-center justify-center text-primary-foreground font-bold text-sm overflow-hidden">
+                        {staff.avatar_url ? <img src={staff.avatar_url} alt="" className="w-full h-full object-cover" /> : staff.full_name?.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-heading font-semibold text-sm text-foreground truncate">{staff.full_name}</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          P:{staff.plansScore}% · Proj:{staff.projectsScore}% · T:{staff.ticketsScore}% · A:{staff.attendanceScore}%
+                        </div>
+                      </div>
+                      <div className={`font-heading font-bold text-lg ${staff.overallScore >= 80 ? "text-green-600" : staff.overallScore >= 60 ? "text-amber-600" : "text-destructive"}`}>
+                        {staff.overallScore}%
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
           <TabsContent value="records">
             <Card>
               <CardHeader>
