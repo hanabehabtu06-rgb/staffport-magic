@@ -47,7 +47,7 @@ export default function ProjectsPage() {
   const [showAddMilestone, setShowAddMilestone] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [groupForm, setGroupForm] = useState({ name: "", description: "", member_ids: [] as string[], start_date: undefined as Date | undefined, end_date: undefined as Date | undefined });
-  const [taskForm, setTaskForm] = useState({ title: "", description: "", assigned_to: "", status: "todo" });
+  const [taskForm, setTaskForm] = useState({ title: "", description: "", assigned_to: "", status: "todo", attachments: [] as string[] });
   const [milestoneForm, setMilestoneForm] = useState({ target_percentage: 25, target_date: undefined as Date | undefined });
   const [reviewForm, setReviewForm] = useState({ milestone_id: "", status: "on_track", notes: "", action_items: "" });
   const [showReview, setShowReview] = useState<string | null>(null);
