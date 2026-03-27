@@ -40,7 +40,9 @@ export default function PerformancePage() {
   const [periodFilter, setPeriodFilter] = useState("weekly");
   const [trendStaff, setTrendStaff] = useState("");
   const [trendPeriod, setTrendPeriod] = useState("weekly");
-
+  const [myWeighted, setMyWeighted] = useState<WeightedScore | null>(null);
+  const [allWeighted, setAllWeighted] = useState<any[]>([]);
+  const [weightedMonth, setWeightedMonth] = useState(format(new Date(), "yyyy-MM"));
   useEffect(() => {
     loadData();
 
