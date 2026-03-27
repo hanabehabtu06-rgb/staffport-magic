@@ -228,8 +228,9 @@ export default function PerformancePage() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full">
+          <TabsList className="w-full flex-wrap">
             <TabsTrigger value="overview" className="flex-1 gap-1"><BarChart3 className="w-3 h-3" />Overview</TabsTrigger>
+            <TabsTrigger value="weighted" className="flex-1 gap-1"><Scale className="w-3 h-3" />Weighted</TabsTrigger>
             <TabsTrigger value="records" className="flex-1 gap-1"><TrendingUp className="w-3 h-3" />Plan Records</TabsTrigger>
             <TabsTrigger value="trends" className="flex-1 gap-1"><LineChart className="w-3 h-3" />Trends</TabsTrigger>
             <TabsTrigger value="summaries" className="flex-1 gap-1"><Calendar className="w-3 h-3" />Period Summaries</TabsTrigger>
