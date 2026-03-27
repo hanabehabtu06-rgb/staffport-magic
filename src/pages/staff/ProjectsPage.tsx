@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import StaffLayout from "@/components/staff/StaffLayout";
 import TeamChat from "@/components/staff/TeamChat";
+import ProjectFileUpload from "@/components/staff/ProjectFileUpload";
 
 const STATUS_CONFIG = {
   todo: { label: "To Do", icon: Circle, color: "text-muted-foreground" },
