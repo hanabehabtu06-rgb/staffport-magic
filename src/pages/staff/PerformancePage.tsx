@@ -43,6 +43,11 @@ export default function PerformancePage() {
   const [myWeighted, setMyWeighted] = useState<WeightedScore | null>(null);
   const [allWeighted, setAllWeighted] = useState<any[]>([]);
   const [weightedMonth, setWeightedMonth] = useState(format(new Date(), "yyyy-MM"));
+
+  useEffect(() => {
+    loadData();
+  }, [weightedMonth]);
+
   useEffect(() => {
     loadData();
 
