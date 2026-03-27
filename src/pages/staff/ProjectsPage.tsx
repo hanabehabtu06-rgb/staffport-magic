@@ -135,6 +135,7 @@ export default function ProjectsPage() {
       assigned_to: taskForm.assigned_to || null,
       status: taskForm.status,
       created_by: authUser.id,
+      attachments: taskForm.attachments.length > 0 ? taskForm.attachments : null,
     });
     if (taskForm.assigned_to) {
       await supabase.from("notifications").insert({
@@ -145,7 +146,7 @@ export default function ProjectsPage() {
         related_id: selectedGroup.id,
       });
     }
-    setTaskForm({ title: "", description: "", assigned_to: "", status: "todo" });
+    setTaskForm({ title: "", description: "", assigned_to: "", status: "todo", attachments: [] });
     setShowNewTask(false);
     loadTasks(selectedGroup.id);
   };
