@@ -13,7 +13,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StaffLayout from "@/components/staff/StaffLayout";
 import PlanPerformanceTracker from "@/components/staff/PlanPerformanceTracker";
 import PerformanceTrendsChart from "@/components/staff/PerformanceTrendsChart";
+import WeightedPerformanceCard from "@/components/staff/WeightedPerformanceCard";
 import { getQuarterKey, getWeekKey, getMonthKey } from "@/lib/performance-utils";
+import { calculateWeightedPerformance, calculateAllStaffPerformance, type WeightedScore } from "@/lib/weighted-performance";
 
 const currentQuarter = () => getQuarterKey(new Date());
 
