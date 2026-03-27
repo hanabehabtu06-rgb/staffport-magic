@@ -430,6 +430,13 @@ export default function ProjectsPage() {
                                   <option value="done">Done</option>
                                 </select>
                               </div>
+                              <ProjectFileUpload
+                                bucket="project-attachments"
+                                folder={selectedGroup.id}
+                                existingUrls={taskForm.attachments}
+                                onUploadComplete={(urls) => setTaskForm((f) => ({ ...f, attachments: urls }))}
+                                maxFiles={5}
+                              />
                               <div className="flex gap-2">
                                 <Button size="sm" variant="outline" onClick={() => setShowNewTask(false)} className="flex-1">Cancel</Button>
                                 <Button size="sm" onClick={createTask} className="flex-1 gradient-brand text-primary-foreground font-heading">Add Task</Button>
