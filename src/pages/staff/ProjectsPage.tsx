@@ -470,6 +470,17 @@ export default function ProjectsPage() {
                                       <span className="text-[10px] text-muted-foreground">{task.assignee.full_name}</span>
                                     </div>
                                   )}
+                                  {task.attachments && task.attachments.length > 0 && (
+                                    <div className="flex items-center gap-1 mt-1.5">
+                                      <Paperclip className="w-3 h-3 text-muted-foreground" />
+                                      <span className="text-[10px] text-muted-foreground">{task.attachments.length} file(s)</span>
+                                      {task.attachments.map((url: string, i: number) => (
+                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline">
+                                          <File className="w-3 h-3 inline" />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  )}
                                   {isMember && (
                                     <div className="flex gap-1 mt-2">
                                       {Object.keys(STATUS_CONFIG).filter((s) => s !== status).map((s) => (
