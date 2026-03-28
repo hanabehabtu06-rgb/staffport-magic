@@ -623,10 +623,12 @@ export type Database = {
       project_groups: {
         Row: {
           budget: number | null
+          completed_at: string | null
           created_at: string
           created_by: string
           description: string | null
           end_date: string | null
+          final_attachment_urls: string[] | null
           id: string
           manager_id: string | null
           member_ids: string[] | null
@@ -637,10 +639,12 @@ export type Database = {
         }
         Insert: {
           budget?: number | null
+          completed_at?: string | null
           created_at?: string
           created_by: string
           description?: string | null
           end_date?: string | null
+          final_attachment_urls?: string[] | null
           id?: string
           manager_id?: string | null
           member_ids?: string[] | null
@@ -651,10 +655,12 @@ export type Database = {
         }
         Update: {
           budget?: number | null
+          completed_at?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
           end_date?: string | null
+          final_attachment_urls?: string[] | null
           id?: string
           manager_id?: string | null
           member_ids?: string[] | null
@@ -761,6 +767,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "project_tasks_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "project_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_updates: {
+        Row: {
+          attachment_urls: string[] | null
+          author_id: string
+          content: string
+          created_at: string
+          group_id: string
+          id: string
+          update_type: string
+        }
+        Insert: {
+          attachment_urls?: string[] | null
+          author_id: string
+          content: string
+          created_at?: string
+          group_id: string
+          id?: string
+          update_type?: string
+        }
+        Update: {
+          attachment_urls?: string[] | null
+          author_id?: string
+          content?: string
+          created_at?: string
+          group_id?: string
+          id?: string
+          update_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_updates_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
             referencedRelation: "project_groups"
