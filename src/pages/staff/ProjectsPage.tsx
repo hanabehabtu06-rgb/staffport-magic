@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, FolderKanban, Users, Circle, Clock, Check, ChevronRight, MessageSquare, BarChart3, CalendarIcon, Target, AlertTriangle, CheckCircle, Flag, Send, Trash2, Paperclip, File } from "lucide-react";
+import { Plus, FolderKanban, Users, Circle, Clock, Check, ChevronRight, MessageSquare, BarChart3, CalendarIcon, Target, AlertTriangle, CheckCircle, Flag, Send, Trash2, Paperclip, File, Archive, FileText, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,6 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import StaffLayout from "@/components/staff/StaffLayout";
 import TeamChat from "@/components/staff/TeamChat";
 import ProjectFileUpload from "@/components/staff/ProjectFileUpload";
@@ -32,6 +33,8 @@ const MILESTONE_STATUS_CONFIG: Record<string, { label: string; color: string; bg
   completed: { label: "Completed", color: "text-green-700", bg: "bg-green-200 dark:bg-green-800/40" },
 };
 
+const UPDATE_TYPES = ["daily", "weekly", "monthly", "quarterly"] as const;
+
 export default function ProjectsPage() {
   const { user, isCeo, isExecutive } = useAuth();
   const navigate = useNavigate();
@@ -41,18 +44,24 @@ export default function ProjectsPage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [milestones, setMilestones] = useState<any[]>([]);
   const [comments, setComments] = useState<any[]>([]);
+  const [updates, setUpdates] = useState<any[]>([]);
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showAddMilestone, setShowAddMilestone] = useState(false);
+  const [showNewUpdate, setShowNewUpdate] = useState(false);
+  const [showComplete, setShowComplete] = useState(false);
   const [newComment, setNewComment] = useState("");
-  const [groupForm, setGroupForm] = useState({ name: "", description: "", member_ids: [] as string[], start_date: undefined as Date | undefined, end_date: undefined as Date | undefined });
+  const [groupForm, setGroupForm] = useState({ name: "", description: "", member_ids: [] as string[], start_date: undefined as Date | undefined, end_date: undefined as Date | undefined, attachments: [] as string[] });
   const [taskForm, setTaskForm] = useState({ title: "", description: "", assigned_to: "", status: "todo", attachments: [] as string[] });
   const [milestoneForm, setMilestoneForm] = useState({ target_percentage: 25, target_date: undefined as Date | undefined });
   const [reviewForm, setReviewForm] = useState({ milestone_id: "", status: "on_track", notes: "", action_items: "" });
+  const [updateForm, setUpdateForm] = useState({ content: "", update_type: "daily" as string, attachments: [] as string[] });
+  const [completeForm, setCompleteForm] = useState({ attachments: [] as string[] });
   const [showReview, setShowReview] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("tasks");
+  const [viewMode, setViewMode] = useState<"active" | "completed">("active");
 
   useEffect(() => {
     loadGroups();
@@ -65,6 +74,9 @@ export default function ProjectsPage() {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "project_milestones" }, () => {
         if (selectedGroup) loadMilestones(selectedGroup.id);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "project_updates" }, () => {
+        if (selectedGroup) loadUpdates(selectedGroup.id);
       })
       .subscribe();
 
@@ -97,11 +109,17 @@ export default function ProjectsPage() {
     setComments(data || []);
   };
 
+  const loadUpdates = async (groupId: string) => {
+    const { data } = await supabase.from("project_updates").select("*").eq("group_id", groupId).order("created_at", { ascending: false });
+    setUpdates(data || []);
+  };
+
   const selectGroup = (group: any) => {
     setSelectedGroup(group);
     loadTasks(group.id);
     loadMilestones(group.id);
     loadComments(group.id);
+    loadUpdates(group.id);
     setShowChat(false);
     setActiveTab("tasks");
   };
@@ -119,9 +137,10 @@ export default function ProjectsPage() {
       start_date: groupForm.start_date ? format(groupForm.start_date, "yyyy-MM-dd") : null,
       end_date: groupForm.end_date ? format(groupForm.end_date, "yyyy-MM-dd") : null,
     });
-    setGroupForm({ name: "", description: "", member_ids: [], start_date: undefined, end_date: undefined });
+    setGroupForm({ name: "", description: "", member_ids: [], start_date: undefined, end_date: undefined, attachments: [] });
     setShowNewGroup(false);
     loadGroups();
+    toast.success("Project created successfully");
   };
 
   const createTask = async () => {
@@ -149,6 +168,7 @@ export default function ProjectsPage() {
     setTaskForm({ title: "", description: "", assigned_to: "", status: "todo", attachments: [] });
     setShowNewTask(false);
     loadTasks(selectedGroup.id);
+    toast.success("Task added");
   };
 
   const updateTaskStatus = async (taskId: string, status: string) => {
@@ -178,7 +198,6 @@ export default function ProjectsPage() {
       actual_date: reviewForm.status === "completed" ? new Date().toISOString().split("T")[0] : null,
     }).eq("id", milestoneId);
 
-    // Notify team members
     if (selectedGroup?.member_ids && reviewForm.status !== "on_track") {
       const notifications = selectedGroup.member_ids
         .filter((id: string) => id !== user.id)
@@ -213,7 +232,79 @@ export default function ProjectsPage() {
     if (selectedGroup) loadComments(selectedGroup.id);
   };
 
+  const submitUpdate = async () => {
+    if (!updateForm.content.trim() || !selectedGroup || !user) return;
+    const { error } = await supabase.from("project_updates").insert({
+      group_id: selectedGroup.id,
+      author_id: user.id,
+      content: updateForm.content,
+      update_type: updateForm.update_type,
+      attachment_urls: updateForm.attachments.length > 0 ? updateForm.attachments : [],
+    });
+    if (error) {
+      toast.error("Failed to submit update");
+      return;
+    }
+    // Notify other members
+    if (selectedGroup.member_ids) {
+      const notifications = selectedGroup.member_ids
+        .filter((id: string) => id !== user.id)
+        .map((memberId: string) => ({
+          user_id: memberId,
+          type: "task",
+          title: `${updateForm.update_type.charAt(0).toUpperCase() + updateForm.update_type.slice(1)} update: ${selectedGroup.name}`,
+          message: updateForm.content.slice(0, 100),
+          related_id: selectedGroup.id,
+        }));
+      if (notifications.length > 0) await supabase.from("notifications").insert(notifications);
+    }
+    setUpdateForm({ content: "", update_type: "daily", attachments: [] });
+    setShowNewUpdate(false);
+    loadUpdates(selectedGroup.id);
+    toast.success("Progress update submitted");
+  };
+
+  const completeProject = async () => {
+    if (!selectedGroup || !user) return;
+    const { error } = await supabase.from("project_groups").update({
+      status: "completed",
+      completed_at: new Date().toISOString(),
+      final_attachment_urls: completeForm.attachments.length > 0 ? completeForm.attachments : [],
+    }).eq("id", selectedGroup.id);
+    if (error) {
+      toast.error("Failed to complete project");
+      return;
+    }
+    // Notify members
+    if (selectedGroup.member_ids) {
+      const notifications = selectedGroup.member_ids
+        .filter((id: string) => id !== user.id)
+        .map((memberId: string) => ({
+          user_id: memberId,
+          type: "task",
+          title: `Project completed: ${selectedGroup.name}`,
+          message: "This project has been marked as completed.",
+          related_id: selectedGroup.id,
+        }));
+      if (notifications.length > 0) await supabase.from("notifications").insert(notifications);
+    }
+    setShowComplete(false);
+    setCompleteForm({ attachments: [] });
+    setSelectedGroup({ ...selectedGroup, status: "completed", completed_at: new Date().toISOString(), final_attachment_urls: completeForm.attachments });
+    loadGroups();
+    toast.success("Project marked as completed!");
+  };
+
+  const deleteUpdate = async (updateId: string) => {
+    await supabase.from("project_updates").delete().eq("id", updateId);
+    if (selectedGroup) loadUpdates(selectedGroup.id);
+  };
+
+  const activeGroups = groups.filter(g => g.status !== "completed");
+  const completedGroups = groups.filter(g => g.status === "completed");
+  const displayedGroups = viewMode === "active" ? activeGroups : completedGroups;
   const isMember = selectedGroup?.member_ids?.includes(user?.id) || isCeo || isExecutive;
+  const isCompleted = selectedGroup?.status === "completed";
 
   return (
     <StaffLayout>
@@ -231,7 +322,15 @@ export default function ProjectsPage() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Groups List */}
           <div className="lg:col-span-1 space-y-3">
-            <h2 className="text-sm font-heading font-bold text-muted-foreground uppercase tracking-widest">Projects ({groups.length})</h2>
+            {/* Active / Completed toggle */}
+            <div className="flex gap-2 mb-2">
+              <Button size="sm" variant={viewMode === "active" ? "default" : "outline"} onClick={() => { setViewMode("active"); setSelectedGroup(null); }} className="flex-1 gap-1 text-xs">
+                <FolderKanban className="w-3 h-3" />Active ({activeGroups.length})
+              </Button>
+              <Button size="sm" variant={viewMode === "completed" ? "default" : "outline"} onClick={() => { setViewMode("completed"); setSelectedGroup(null); }} className="flex-1 gap-1 text-xs">
+                <Archive className="w-3 h-3" />Completed ({completedGroups.length})
+              </Button>
+            </div>
 
             <AnimatePresence>
               {showNewGroup && (
@@ -277,6 +376,14 @@ export default function ProjectsPage() {
                           ))}
                         </div>
                       </div>
+                      {/* Optional file attachments */}
+                      <ProjectFileUpload
+                        bucket="project-attachments"
+                        folder="project-requirements"
+                        existingUrls={groupForm.attachments}
+                        onUploadComplete={(urls) => setGroupForm((f) => ({ ...f, attachments: urls }))}
+                        maxFiles={5}
+                      />
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={() => setShowNewGroup(false)} className="flex-1">Cancel</Button>
                         <Button size="sm" onClick={createGroup} className="flex-1 gradient-brand text-primary-foreground font-heading">Create</Button>
@@ -288,17 +395,23 @@ export default function ProjectsPage() {
             </AnimatePresence>
 
             {loading ? [1, 2, 3].map((i) => <div key={i} className="h-16 bg-muted rounded-xl animate-pulse" />) :
-              groups.map((g) => (
+              displayedGroups.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <FolderKanban className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm font-heading">No {viewMode} projects</p>
+                </div>
+              ) : displayedGroups.map((g) => (
                 <Card key={g.id} onClick={() => selectGroup(g)} className={`cursor-pointer transition-all hover:shadow-card ${selectedGroup?.id === g.id ? "border-primary shadow-card ring-1 ring-primary/30" : ""}`}>
                   <CardContent className="p-4 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl gradient-brand flex items-center justify-center text-primary-foreground flex-shrink-0">
-                      <FolderKanban className="w-5 h-5" />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-primary-foreground flex-shrink-0 ${g.status === "completed" ? "bg-green-600" : "gradient-brand"}`}>
+                      {g.status === "completed" ? <CheckCircle className="w-5 h-5" /> : <FolderKanban className="w-5 h-5" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-heading font-semibold text-sm text-foreground truncate">{g.name}</div>
                       <div className="text-xs text-muted-foreground">
                         {g.member_ids?.length || 0} members
-                        {g.end_date && <span className="ml-2">· Due {format(new Date(g.end_date), "MMM d")}</span>}
+                        {g.completed_at && <span className="ml-2">· Completed {format(new Date(g.completed_at), "MMM d")}</span>}
+                        {!g.completed_at && g.end_date && <span className="ml-2">· Due {format(new Date(g.end_date), "MMM d")}</span>}
                       </div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
@@ -321,19 +434,81 @@ export default function ProjectsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-heading font-bold text-foreground">{selectedGroup.name}</h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-heading font-bold text-foreground">{selectedGroup.name}</h2>
+                      {isCompleted && <Badge className="bg-green-600 text-primary-foreground border-0 text-[10px]">Completed</Badge>}
+                    </div>
                     {selectedGroup.description && <p className="text-muted-foreground text-sm">{selectedGroup.description}</p>}
                     <div className="flex gap-3 text-xs text-muted-foreground mt-1">
                       {selectedGroup.start_date && <span>Start: {format(new Date(selectedGroup.start_date), "MMM d, yyyy")}</span>}
                       {selectedGroup.end_date && <span>Due: {format(new Date(selectedGroup.end_date), "MMM d, yyyy")}</span>}
+                      {selectedGroup.completed_at && <span className="text-green-600">Completed: {format(new Date(selectedGroup.completed_at), "MMM d, yyyy")}</span>}
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    {!isCompleted && isMember && isExecutive && (
+                      <Button onClick={() => setShowComplete(true)} size="sm" variant="outline" className="gap-1.5 text-green-600 border-green-600/30 hover:bg-green-600/10">
+                        <CheckCircle className="w-3.5 h-3.5" />Complete
+                      </Button>
+                    )}
                     <Button onClick={() => setShowChat(true)} size="sm" variant="outline" className="gap-1.5">
                       <MessageSquare className="w-3.5 h-3.5" />Chat
                     </Button>
                   </div>
                 </div>
+
+                {/* Complete Project Modal */}
+                <AnimatePresence>
+                  {showComplete && (
+                    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                      <Card className="border-green-600/30">
+                        <CardContent className="p-4 space-y-3">
+                          <h3 className="font-heading font-bold text-sm text-foreground">Complete Project</h3>
+                          <p className="text-xs text-muted-foreground">Mark this project as completed. Optionally attach final deliverables (screenshots, files).</p>
+                          <ProjectFileUpload
+                            bucket="project-attachments"
+                            folder={`${selectedGroup.id}/final`}
+                            existingUrls={completeForm.attachments}
+                            onUploadComplete={(urls) => setCompleteForm({ attachments: urls })}
+                            maxFiles={10}
+                          />
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => setShowComplete(false)} className="flex-1">Cancel</Button>
+                            <Button size="sm" onClick={completeProject} className="flex-1 bg-green-600 hover:bg-green-700 text-primary-foreground font-heading">
+                              <CheckCircle className="w-3.5 h-3.5 mr-1" />Mark Complete
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Final deliverables for completed projects */}
+                {isCompleted && selectedGroup.final_attachment_urls?.length > 0 && (
+                  <Card className="border-green-600/20 bg-green-50/50 dark:bg-green-900/10">
+                    <CardContent className="p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <FileText className="w-3.5 h-3.5 text-green-600" />
+                        <span className="text-xs font-heading font-semibold text-green-700 dark:text-green-400">Final Deliverables</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedGroup.final_attachment_urls.map((url: string, i: number) => {
+                          const isImg = /\.(png|jpg|jpeg|gif|webp)$/i.test(url);
+                          return isImg ? (
+                            <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                              <img src={url} alt="" className="w-16 h-16 rounded object-cover border border-border hover:ring-2 ring-primary transition-all" />
+                            </a>
+                          ) : (
+                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs text-primary hover:underline">
+                              <File className="w-3 h-3" />File {i + 1}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Progress Summary */}
                 {tasks.length > 0 && (() => {
@@ -390,17 +565,18 @@ export default function ProjectsPage() {
                   </CardContent>
                 </Card>
 
-                {/* Tabs: Tasks / Milestones / Comments */}
+                {/* Tabs */}
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                   <TabsList className="w-full">
                     <TabsTrigger value="tasks" className="flex-1 gap-1"><Circle className="w-3 h-3" />Tasks</TabsTrigger>
+                    <TabsTrigger value="updates" className="flex-1 gap-1"><ClipboardList className="w-3 h-3" />Updates</TabsTrigger>
                     <TabsTrigger value="milestones" className="flex-1 gap-1"><Target className="w-3 h-3" />Milestones</TabsTrigger>
                     <TabsTrigger value="comments" className="flex-1 gap-1"><MessageSquare className="w-3 h-3" />Comments</TabsTrigger>
                   </TabsList>
 
                   {/* TASKS TAB */}
                   <TabsContent value="tasks" className="space-y-3">
-                    {isMember && (
+                    {isMember && !isCompleted && (
                       <div className="flex justify-end">
                         <Button onClick={() => setShowNewTask(true)} size="sm" className="gradient-brand text-primary-foreground font-heading gap-1.5">
                           <Plus className="w-3.5 h-3.5" />Add Task
@@ -481,7 +657,7 @@ export default function ProjectsPage() {
                                       ))}
                                     </div>
                                   )}
-                                  {isMember && (
+                                  {isMember && !isCompleted && (
                                     <div className="flex gap-1 mt-2">
                                       {Object.keys(STATUS_CONFIG).filter((s) => s !== status).map((s) => (
                                         <button key={s} onClick={() => updateTaskStatus(task.id, s)} className="text-[9px] px-1.5 py-0.5 rounded bg-muted hover:bg-primary/10 hover:text-primary text-muted-foreground transition-colors font-heading">
@@ -499,9 +675,107 @@ export default function ProjectsPage() {
                     </div>
                   </TabsContent>
 
+                  {/* UPDATES TAB */}
+                  <TabsContent value="updates" className="space-y-3">
+                    {isMember && !isCompleted && (
+                      <div className="flex justify-end">
+                        <Button onClick={() => setShowNewUpdate(true)} size="sm" className="gradient-brand text-primary-foreground font-heading gap-1.5">
+                          <Plus className="w-3.5 h-3.5" />Submit Update
+                        </Button>
+                      </div>
+                    )}
+
+                    <AnimatePresence>
+                      {showNewUpdate && (
+                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                          <Card className="border-primary/30">
+                            <CardContent className="p-4 space-y-3">
+                              <div className="space-y-1">
+                                <label className="text-xs font-heading font-medium text-foreground">Update Type</label>
+                                <div className="flex gap-2">
+                                  {UPDATE_TYPES.map(t => (
+                                    <Button key={t} size="sm" variant={updateForm.update_type === t ? "default" : "outline"}
+                                      onClick={() => setUpdateForm(f => ({ ...f, update_type: t }))}
+                                      className="capitalize text-xs flex-1">
+                                      {t}
+                                    </Button>
+                                  ))}
+                                </div>
+                              </div>
+                              <Textarea placeholder="Describe your progress, what you worked on, blockers, next steps..." rows={4}
+                                value={updateForm.content} onChange={(e) => setUpdateForm(f => ({ ...f, content: e.target.value }))} />
+                              <ProjectFileUpload
+                                bucket="project-attachments"
+                                folder={`${selectedGroup.id}/updates`}
+                                existingUrls={updateForm.attachments}
+                                onUploadComplete={(urls) => setUpdateForm(f => ({ ...f, attachments: urls }))}
+                                maxFiles={5}
+                              />
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() => setShowNewUpdate(false)} className="flex-1">Cancel</Button>
+                                <Button size="sm" onClick={submitUpdate} className="flex-1 gradient-brand text-primary-foreground font-heading">Submit</Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {updates.length === 0 ? (
+                      <div className="py-8 text-center text-muted-foreground">
+                        <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                        <p className="text-sm font-heading">No progress updates yet</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                        {updates.map((u) => {
+                          const author = profiles.find(p => p.user_id === u.author_id);
+                          return (
+                            <Card key={u.id}>
+                              <CardContent className="p-3 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full gradient-brand flex items-center justify-center text-[9px] text-primary-foreground font-bold">
+                                      {author?.full_name?.charAt(0) || "?"}
+                                    </div>
+                                    <span className="text-xs font-heading font-semibold text-foreground">{author?.full_name || "Unknown"}</span>
+                                    <Badge variant="outline" className="text-[10px] capitalize">{u.update_type}</Badge>
+                                    <span className="text-[10px] text-muted-foreground">{format(new Date(u.created_at), "MMM d, h:mm a")}</span>
+                                  </div>
+                                  {(u.author_id === user?.id || isExecutive) && (
+                                    <button onClick={() => deleteUpdate(u.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                                <p className="text-sm text-foreground whitespace-pre-wrap">{u.content}</p>
+                                {u.attachment_urls && u.attachment_urls.length > 0 && (
+                                  <div className="flex flex-wrap gap-2 pt-1">
+                                    {u.attachment_urls.map((url: string, i: number) => {
+                                      const isImg = /\.(png|jpg|jpeg|gif|webp)$/i.test(url);
+                                      return isImg ? (
+                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                          <img src={url} alt="" className="w-14 h-14 rounded object-cover border border-border hover:ring-2 ring-primary transition-all" />
+                                        </a>
+                                      ) : (
+                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 px-2 py-1 bg-muted rounded text-[10px] text-primary hover:underline">
+                                          <File className="w-3 h-3" />Attachment {i + 1}
+                                        </a>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </TabsContent>
+
                   {/* MILESTONES TAB */}
                   <TabsContent value="milestones" className="space-y-3">
-                    {isExecutive && (
+                    {isExecutive && !isCompleted && (
                       <div className="flex justify-end">
                         <Button onClick={() => setShowAddMilestone(true)} size="sm" className="gradient-brand text-primary-foreground font-heading gap-1.5">
                           <Plus className="w-3.5 h-3.5" />Add Milestone
@@ -557,7 +831,6 @@ export default function ProjectsPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {/* Milestone Timeline */}
                         <div className="relative">
                           <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
                           {milestones.map((m) => {
@@ -597,8 +870,7 @@ export default function ProjectsPage() {
                                       </div>
                                     )}
 
-                                    {/* Review button for CEO/Exec */}
-                                    {(isCeo || isExecutive) && m.status !== "completed" && (
+                                    {(isCeo || isExecutive) && m.status !== "completed" && !isCompleted && (
                                       <>
                                         {showReview === m.id ? (
                                           <div className="space-y-2 p-2 border border-primary/20 rounded-lg">
